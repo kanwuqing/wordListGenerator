@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-自动翻译生词，合并重复条目，生成 docx 表格，并输出翻译后的词汇文本文件。
-用法: python build_vocab.py raw_words.txt [-o output.docx]
+python main.py raw.txt [-o output.docx] [-c 1|2|3]
 """
 
 import re
 import os
 import argparse
+import math
 from collections import OrderedDict
 from docx import Document
 from docx.shared import Pt, Inches
@@ -41,17 +41,14 @@ def parse_and_merge(filepath):
             meaning = None
             if len(parts) > 1:
                 rest = parts[1].strip()
-                # 去除可能存在的词性标记（如 "n. 放弃" → 只保留释义）
                 pos_match = re.match(r'\(?([a-z]+\.)\)?\s*(.*)', rest, re.IGNORECASE)
                 if pos_match:
                     meaning = pos_match.group(2).strip()
                 else:
                     meaning = rest
-                # 如果提取出的 meaning 是空字符串，视为无释义
                 if not meaning:
                     meaning = None
 
-            # 合并逻辑：有释义则更新，无释义且单词未出现过才记为 None
             if meaning:
                 merged[word] = meaning
             elif word not in merged:
@@ -59,9 +56,11 @@ def parse_and_merge(filepath):
     return merged
 
 def main():
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description='Build printable vocabulary docx with multiple columns')
     parser.add_argument('raw_file')
     parser.add_argument('-o', '--output', default='vocabulary.docx')
+    parser.add_argument('-c', '--columns', type=int, choices=[1, 2, 3], default=1,
+                        help='单词并排列数(1~3, 默认 1)')
     args = parser.parse_args()
 
     # 合并与解析
@@ -77,7 +76,7 @@ def main():
             vocab[word] = meaning
             print(f"\t自动处理: {word} -> {meaning}")
 
-    # 排序（保持输入顺序或字母顺序，这里用字母）
+    # 排序
     sorted_words = sorted(vocab.keys(), key=lambda w: w.replace('_', ' ').lower())
 
     # ---------- 生成 docx ----------
@@ -90,25 +89,44 @@ def main():
     title = doc.add_heading(f'Vocabulary List ({os.path.basename(args.raw_file)})', level=1)
     title.alignment = WD_TABLE_ALIGNMENT.CENTER
 
-    table = doc.add_table(rows=1, cols=2, style='Table Grid')
+    cols = args.columns  # 单词并排列数
+    total_cols = cols * 2  # 每对 (Word, Meaning) 占两栏
+    rows = math.ceil(len(sorted_words) / cols)
+
+    table = doc.add_table(rows=rows + 1, cols=total_cols, style='Table Grid')
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
+
+    # 表头
     hdr_cells = table.rows[0].cells
-    hdr_cells[0].text = 'Word'
-    hdr_cells[1].text = 'Meaning'
-    for i in range(2):
-        for p in hdr_cells[i].paragraphs:
-            p.style.font.bold = True
+    for c in range(cols):
+        hdr_cells[c * 2].text = 'Word'
+        hdr_cells[c * 2 + 1].text = 'Meaning'
+        for i in range(2):
+            for p in hdr_cells[c * 2 + i].paragraphs:
+                p.style.font.bold = True
 
-    for word in sorted_words:
-        row_cells = table.add_row().cells
-        row_cells[0].text = word.replace('_', ' ')
-        row_cells[1].text = vocab[word] if vocab[word] else ''
+    # 数据填充（行优先）
+    for r in range(rows):
+        row_cells = table.rows[r + 1].cells
+        for c in range(cols):
+            idx = r * cols + c
+            if idx < len(sorted_words):
+                word = sorted_words[idx]
+                meaning = vocab[word]
+                row_cells[c * 2].text = word.replace('_', ' ')
+                row_cells[c * 2 + 1].text = meaning if meaning else ''
+            else:
+                # 留空
+                pass
 
-    # 调整列宽
-    for cell in table.columns[0].cells:
-        cell.width = Inches(2.0)
-    for cell in table.columns[1].cells:
-        cell.width = Inches(4.5)
+    # 列宽自动适应（简单方案，可根据需要微调）
+    word_width = Inches(1.2)
+    meaning_width = Inches(2.0)
+    for c in range(cols):
+        for cell in table.columns[c * 2].cells:
+            cell.width = word_width
+        for cell in table.columns[c * 2 + 1].cells:
+            cell.width = meaning_width
 
     doc.save(args.output)
     print(f"✅ 词汇表已生成: {args.output}")

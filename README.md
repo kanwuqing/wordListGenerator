@@ -36,7 +36,7 @@ pip install translate PyDictionary python-docx
 
 ## 使用方法
 
-### 1. 准备你的生词文件 `raw_words.txt`
+### 1. 准备你的生词文件 `raw.txt`
 
 按照以下格式每行一条记录: 
 
@@ -57,7 +57,7 @@ pip install translate PyDictionary python-docx
 ### 2. 运行脚本
 
 ```bash
-python main.py raw_words.txt -o 生词表.docx
+python main.py raw.txt -o output.docx
 ```
 
 终端会输出处理进度, 例如: 
@@ -72,8 +72,9 @@ python main.py raw_words.txt -o 生词表.docx
 ## 文件说明
 
 - `main.py` – 主脚本, 一键完成解析、翻译、生成表格
-- `raw_words.txt` – 你手写的原始生词本(需要自行创建)
-- `vocabulary.docx` – 最终生成的可打印词汇表(默认输出文件名)
+- `raw.txt` – 你手写的原始生词本(需要自行创建)
+- `output.docx` – 最终生成的可打印词汇表(默认输出文件名)
+- `-c 1|2|3` - 可选参数, 最终输出的表格的列数(默认为1列单词)
 
 ## 常见问题
 
